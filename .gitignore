@@ -161,3 +161,10 @@ cython_debug/
 
 .ruff_cache/
 *.zip
+
+# macOS local metadata
+.DS_Store
+
+# Downloaded datasets and generated data artifacts
+data/
+*.gz
