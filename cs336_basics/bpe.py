@@ -1,5 +1,5 @@
 import regex
-from collections import Counter
+from collections import Counter, defaultdict
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
 # 按照特殊token分割
@@ -83,3 +83,16 @@ def train_bpe(input_path, vocab_size, special_tokens):
         table = merge(table, best)
 
     return vocab, merges
+
+# 以上已经实现了这道题的逻辑，以下是加速部分
+def build_index(table):
+    pair2count = Counter()
+    pair2tokens = defaultdict(set)
+    for pre_token, count in table.items():
+        for i in range(len(pre_token) - 1):
+            pair = (pre_token[i], pre_token[i+1])            
+            pair2count[pair] += count         
+            pair2tokens[pair].add(pre_token)      
+    return pair2count, pair2tokens
+
+
