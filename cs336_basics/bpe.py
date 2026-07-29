@@ -2,6 +2,7 @@ import regex
 from collections import Counter, defaultdict
 import os
 from typing import BinaryIO
+import time
 from multiprocessing import Pool
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
@@ -160,7 +161,7 @@ def find_chunk_boundaries(
     return sorted(set(chunk_boundaries))
 
 
-def build_table_parallel(path, special_tokens, num_procs=10):
+def build_table_parallel(path, special_tokens, num_procs=12):
     with open(path, "rb") as f:
         split_token = special_tokens[0].encode("utf-8")
         boundaries = find_chunk_boundaries(f, num_procs, split_token)
@@ -244,20 +245,18 @@ def train_bpe_fast_parallel(input_path, vocab_size, special_tokens):
     for i in range(256):
         vocab[offset + i] = bytes([i])
 
-
-    #打印一下进度
     print("开始预分词")
-
-    # 建立初始频次表（并行）
+    t_pre = time.time()
     table = build_table_parallel(input_path, special_tokens)
-
-    print(f"预分词完成，{len(table)} 种pre-token, 开始merge")#还是打印一下进度
+    pre_time = time.time() - t_pre
+    print(f"预分词完成，用时 {pre_time:.1f} 秒，{len(table)} 种pre-token")
 
     # 建两张索引表
     pair2count, pair2tokens = build_index(table)
     merges = []
     num_merges = vocab_size - len(vocab)
 
+    t_merge = time.time()
     for step in range(num_merges):
         if not pair2count:
             break
@@ -285,6 +284,8 @@ def train_bpe_fast_parallel(input_path, vocab_size, special_tokens):
         if step % 500 == 0:
             print(f"merge 进度 {step}/{num_merges}")
 
+    merge_time = time.time() - t_merge
+    print(f"merge 完成，用时 {merge_time:.1f} 秒")
     return vocab, merges
 
 

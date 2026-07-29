@@ -5,18 +5,18 @@ import psutil
 import resource
 
 if __name__ == "__main__":
-    train_path = "data/TinyStoriesV2-GPT4-train.txt"
+    train_path = "data/owt_train.txt"
 
     
     t0 = time.time()
-    vocab, merges = train_bpe_fast_parallel(train_path, 10000, ["<|endoftext|>"])
+    vocab, merges = train_bpe_fast_parallel(train_path, 32000, ["<|endoftext|>"])
     t1 = time.time()
     print(f"耗时 {t1 - t0:.1f} 秒")
 
     # 存盘
-    with open("model/ts_vocab.pkl", "wb") as f:
+    with open("model/owt_vocab.pkl", "wb") as f:
         pickle.dump(vocab, f)
-    with open("model/ts_merges.pkl", "wb") as f:
+    with open("model/owt_merges.pkl", "wb") as f:
         pickle.dump(merges, f)
 
 
