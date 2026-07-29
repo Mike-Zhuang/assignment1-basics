@@ -4,6 +4,7 @@ import os
 from typing import BinaryIO
 import time
 from multiprocessing import Pool
+import heapq
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
 # 按照特殊token分割
@@ -291,6 +292,81 @@ def train_bpe_fast_parallel(input_path, vocab_size, special_tokens):
 
 
 
+#继续用heap降低复杂度加速
+
+class RevBytes:
+    def __init__(self, pair):
+        self.pair = pair
+    def __lt__(self, other):
+        return self.pair > other.pair    # 故意反过来 让大的排在堆前面
+
+def train_bpe_fast_parallel_heap(input_path, vocab_size, special_tokens): 
+    vocab = {}
+    for i, tok in enumerate(special_tokens):
+        vocab[i] = tok.encode("utf-8")
+    offset = len(special_tokens)
+    for i in range(256):
+        vocab[offset + i] = bytes([i])
+
+    print("开始预分词")
+    t_pre = time.time()
+    table = build_table_parallel(input_path, special_tokens)
+    pre_time = time.time() - t_pre
+    print(f"预分词完成，用时 {pre_time:.1f} 秒，{len(table)} 种pre-token")
+
+    # 建两张索引表
+    pair2count, pair2tokens = build_index(table)
+    merges = []
+    num_merges = vocab_size - len(vocab)
+
+    # 建堆
+    heap = []
+    for p, c in pair2count.items():
+        heapq.heappush(heap, (-c, RevBytes(p), p))
 
 
+    t_merge = time.time()
+    for step in range(num_merges):
+        if not pair2count:
+            break
+        best = None
+        while heap:
+            neg_c, _, cand = heapq.heappop(heap)
+            if -neg_c == pair2count.get(cand, 0) and pair2count.get(cand, 0) > 0:
+                best = cand
+                break
 
+        if best is None:
+            break
+
+        merges.append(best)
+        vocab[len(vocab)] = best[0] + best[1]
+        affected = list(pair2tokens[best])   # 快照，避免遍历时改集合出错
+        for old in affected:
+            count = table[old]
+            new = merge_one(old, best)
+            for p in pairs_of(old): 
+                pair2count[p] -= count
+                pair2tokens[p].discard(old)
+                if pair2count[p] == 0:
+                    del pair2count[p]
+                else:
+                    heapq.heappush(heap, (-pair2count[p], RevBytes(p), p))
+
+            for p in pairs_of(new):
+                pair2count[p] += count
+                pair2tokens[p].add(new)
+
+                heapq.heappush(heap, (-pair2count[p], RevBytes(p), p))
+
+
+            del table[old]
+            table[new] += count
+
+        #打印一下训练进度，避免无聊
+        if step % 500 == 0:
+            print(f"merge 进度 {step}/{num_merges}")
+
+    merge_time = time.time() - t_merge
+    print(f"merge 完成，用时 {merge_time:.1f} 秒")
+    return vocab, merges
