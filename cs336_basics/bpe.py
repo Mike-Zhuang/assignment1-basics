@@ -107,7 +107,7 @@ def process_chunk(path, start, end, special_tokens):
 
     table = Counter()
     for seg in cut(text, special_tokens):
-        table = table + get_frequency(seg)
+        table.update(get_frequency(seg))
 
     return table
 
@@ -160,7 +160,7 @@ def find_chunk_boundaries(
     return sorted(set(chunk_boundaries))
 
 
-def build_table_parallel(path, special_tokens, num_procs=4):
+def build_table_parallel(path, special_tokens, num_procs=10):
     with open(path, "rb") as f:
         split_token = special_tokens[0].encode("utf-8")
         boundaries = find_chunk_boundaries(f, num_procs, split_token)
@@ -173,7 +173,7 @@ def build_table_parallel(path, special_tokens, num_procs=4):
 
     total = Counter()
     for c in results:
-        total = total + c
+        total.update(c)
     return total
 
 
