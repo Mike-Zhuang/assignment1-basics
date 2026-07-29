@@ -245,15 +245,20 @@ def train_bpe_fast_parallel(input_path, vocab_size, special_tokens):
         vocab[offset + i] = bytes([i])
 
 
+    #打印一下进度
+    print("开始预分词")
+
     # 建立初始频次表（并行）
     table = build_table_parallel(input_path, special_tokens)
+
+    print(f"预分词完成，{len(table)} 种pre-token, 开始merge")#还是打印一下进度
 
     # 建两张索引表
     pair2count, pair2tokens = build_index(table)
     merges = []
     num_merges = vocab_size - len(vocab)
 
-    for _ in range(num_merges):
+    for step in range(num_merges):
         if not pair2count:
             break
         best = max(pair2count, key=lambda p: (pair2count[p], p))
@@ -275,6 +280,10 @@ def train_bpe_fast_parallel(input_path, vocab_size, special_tokens):
 
             del table[old]
             table[new] += count
+
+        #打印一下训练进度，避免无聊
+        if step % 500 == 0:
+            print(f"merge 进度 {step}/{num_merges}")
 
     return vocab, merges
 

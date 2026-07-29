@@ -168,3 +168,5 @@ cython_debug/
 # Downloaded datasets and generated data artifacts
 data/
 *.gz
+
+model/
